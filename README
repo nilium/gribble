@@ -1,0 +1,46 @@
+gribble
+=======
+
+Gribble is a GitLab CI API server, providing the bare minimum needed to
+run a GitLab runner without GitLab itself. It is designed to receive
+webhooks from git hosting platforms and schedule jobs for GitLab CI.
+
+This project is currently heavily work-in-progress and should be
+considered a for-fun project to get GitLab CI -- a great tool -- into
+the hands of more users, without the need to run GitLab, have a GitLab
+membership, mirror your repository to GitLab, and other such things.
+
+If you use GitLab already, this project may have some appeal in
+experimental features that GitLab cannot reasonably support (dynamic
+pipeline generation is planned).
+
+Planned features:
+- Webhooks to schedule jobs.
+    This is necessary since the alternatives are polling and making
+    direct requests to APIs. The former is rude, the latter is rude and,
+    in GitHub's case, will quickly exhaust API quotas.
+
+- Reasonable .gitlab-ci.yml support.
+    The full set of .gitlab-ci.yml options may not be supported since
+    it's something of a moving target. Features considered experimental
+    in normal GitLab CI may not be supported at all.
+
+- Dynamic pipeline generation.
+    This is currently expected to work via an initial plan job that runs
+    a repository's pipeline script (likely bash or Lua) and returns an
+    artifact describing generated jobs.
+
+- Scheduling of arbitrary jobs.
+    Because GitLab CI's API doesn't strictly require anything other than
+    a repository (this may not even be true), it's possible to schedule
+    arbitrary jobs. Providing a control socket or HTTP URI to do such
+    a thing from the command line would be useful and desirable.
+
+
+License
+-------
+
+Gribble is licensed under the MIT license, the same as the GitLab runner.
+This is because Gribble includes code from the GitLab runner project
+(this was a compromise around it being impossible to use the runner's
+common library directly).
