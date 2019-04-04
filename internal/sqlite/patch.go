@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"fmt"
+	"log"
 
 	"crawshaw.io/sqlite"
 )
@@ -105,6 +106,8 @@ func applyPatch(ctx context.Context, conn *sqlite.Conn, savepoint string, patch 
 	ON CONFLICT (component) DO UPDATE SET version = excluded.version`)
 	defer updateVersion.Reset()
 	apply := func() error {
+		log.Printf("Applying patch %q: %q => %d",
+			patch.Name(), patch.Component(), patch.Version())
 		err := patch.Apply(ctx, conn)
 		if err == nil {
 			updateVersion.SetText("$component", patch.Component())

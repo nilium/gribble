@@ -9,6 +9,8 @@ import (
 	"crawshaw.io/sqlite/sqlitex"
 )
 
+var ErrNoConnection = errors.New("no connection")
+
 type DB struct {
 	*sqlitex.Pool
 }
@@ -52,7 +54,7 @@ func (db *DB) setupVersionTable(ctx context.Context) error {
 func (db *DB) haveTable(ctx context.Context, table string) (ok bool, err error) {
 	c := db.Get(ctx)
 	if c == nil {
-		return false, errors.New("unable to get connection")
+		return false, ErrNoConnection
 	}
 	defer db.Put(c)
 
@@ -72,7 +74,7 @@ func (db *DB) haveTable(ctx context.Context, table string) (ok bool, err error) 
 func (db *DB) createVersionTable(ctx context.Context) error {
 	conn := db.Get(ctx)
 	if conn == nil {
-		return errors.New("unable to get connection")
+		return ErrNoConnection
 	}
 	defer db.Put(conn)
 
@@ -87,6 +89,15 @@ func (db *DB) createVersionTable(ctx context.Context) error {
 
 	_, err = stmt.Step()
 	return err
+}
+
+func (db *DB) Migrate(ctx context.Context) error {
+	conn := db.Get(ctx)
+	if conn == nil {
+		return ErrNoConnection
+	}
+	defer db.Put(conn)
+	return systemPatches.Apply(ctx, conn)
 }
 
 func (db *DB) Close() error {

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/julienschmidt/httprouter"
+	"go.spiff.io/gribble/internal/sqlite"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -20,6 +21,10 @@ const (
 	defaultListenAddr  = "127.0.0.1:4077"
 	defaultGracePeriod = time.Second * 30
 )
+
+type DB interface {
+	Migrate(context.Context) error
+}
 
 func main() {
 	var (
@@ -38,6 +43,7 @@ type Prog struct {
 	conf   *Config
 	server *Server
 	flags  *flag.FlagSet
+	db     DB
 
 	stderr io.Writer
 	stdout io.Writer
@@ -68,6 +74,20 @@ func (p Prog) Run(ctx context.Context, flags *flag.FlagSet, argv ...string) (cod
 	defer cancel()
 
 	ctx = cancelOnSignal(ctx, shutdownSignals()...)
+
+	// TODO: Configurable databases, probably, once the interface is better-defined.
+	db, err := sqlite.NewFileDB(ctx, "gribble.db", 8)
+	if err != nil {
+		log.Printf("Unable to open database: %v", err)
+		return 1
+	}
+	defer db.Close()
+
+	p.db = db
+	if err := db.Migrate(ctx); err != nil {
+		log.Printf("Migrations failed: %v", err)
+		return 1
+	}
 
 	listener, err := p.listen()
 	if err != nil {
