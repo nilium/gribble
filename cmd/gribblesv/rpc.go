@@ -1,10 +1,11 @@
 package main
 
 import (
+	"crypto/rand"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
-	"sync"
 
 	"github.com/julienschmidt/httprouter"
 	gciwire "go.spiff.io/gribble/internal/gci-wire"
@@ -14,8 +15,47 @@ var (
 	errBadRequest = ErrorRep{"bad request"}
 )
 
+const (
+	defaultTokenLength = 19
+)
+
 type Server struct {
-	serveSampleJob sync.Once
+	toker *randomToken
+}
+
+type ServerConfig struct {
+	TokenLength int
+	RandSource  io.Reader
+}
+
+func (s *ServerConfig) tokenLength() int {
+	if s == nil || s.TokenLength <= 0 {
+		return defaultTokenLength
+	}
+	return s.TokenLength
+}
+
+func (s *ServerConfig) randReader() io.Reader {
+	if s == nil || s.RandSource == nil {
+		return rand.Reader
+	}
+	return s.RandSource
+}
+
+func NewServer(conf *ServerConfig) (*Server, error) {
+	rng := conf.randReader()
+	tokenLen := conf.tokenLength()
+	toker, err := newRandomToken(tokenLen, rng)
+	if err != nil {
+		return nil, err
+	}
+
+	tok, _ := toker.Token()
+	log.Printf("Server token: %q", tok)
+
+	return &Server{
+		toker: toker,
+	}, nil
 }
 
 func (s *Server) RegisterRunner(w http.ResponseWriter, req *http.Request, params httprouter.Params) (int, interface{}) {
@@ -24,8 +64,12 @@ func (s *Server) RegisterRunner(w http.ResponseWriter, req *http.Request, params
 		return http.StatusBadRequest, errBadRequest
 	}
 
+	if s.toker.Compare(body.Token) != nil {
+		return http.StatusForbidden, nil
+	}
+
 	rep := gciwire.RegisterRunnerResponse{
-		Token: "foobar",
+		Token: "buttsquid",
 	}
 	return http.StatusCreated, &rep
 }
@@ -63,57 +107,5 @@ func (s *Server) RequestJob(w http.ResponseWriter, req *http.Request, params htt
 		return http.StatusBadRequest, errBadRequest
 	}
 
-	code = http.StatusNoContent
-	var rep gciwire.JobResponse
-
-	s.serveSampleJob.Do(func() {
-		rep = gciwire.JobResponse{
-			ID:            1,
-			Token:         "12345678",
-			AllowGitFetch: false,
-			JobInfo: gciwire.JobInfo{
-				Name:        "sample-job",
-				Stage:       "build",
-				ProjectID:   0,
-				ProjectName: "github.com/nilium/codf",
-			},
-			GitInfo: gciwire.GitInfo{
-				RepoURL:   "https://github.com/nilium/codf.git",
-				Ref:       "master",
-				Sha:       "f20916450a27975500ddfbf3b593d619f0338977",
-				BeforeSha: "0000000000000000000000000000000000000000",
-				RefType:   gciwire.RefTypeBranch,
-				Refspecs: []string{
-					"+refs/heads/master:origin/reads/heads/master",
-				},
-			},
-			RunnerInfo: gciwire.RunnerInfo{
-				Timeout: 60,
-			},
-			Variables: gciwire.JobVariables{
-				gciwire.JobVariable{
-					Key:    "PKG",
-					Value:  "go.spiff.io/codf",
-					Public: true,
-				},
-			},
-			Steps: gciwire.Steps{
-				gciwire.Step{
-					Name: gciwire.StepNameScript,
-					Script: gciwire.StepScript{
-						"go test -coverprofile cover.out $PKG\n",
-						"go tool cover -func cover.out\n",
-					},
-					Timeout: 60,
-				},
-			},
-			Image: gciwire.Image{
-				Name: "golang:1.12.1",
-			},
-		}
-		code = http.StatusCreated
-		msg = &rep
-	})
-
-	return
+	return http.StatusNoContent, nil
 }

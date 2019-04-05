@@ -49,13 +49,16 @@ type Prog struct {
 	stdout io.Writer
 }
 
-func (p *Prog) init(flags *flag.FlagSet, argv []string) error {
+func (p *Prog) init(flags *flag.FlagSet, argv []string) (err error) {
 	p.flags = flags
 	p.conf = &Config{
 		Listen: newSockAddr(defaultListenAddr),
 	}
 
-	p.server = &Server{}
+	p.server, err = NewServer(nil) // TODO: Configure server
+	if err != nil {
+		return err
+	}
 
 	flags.Usage = p.usage
 	bindConfigFlags(flags, p.conf)
