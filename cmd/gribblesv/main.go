@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/julienschmidt/httprouter"
+	com "go.spiff.io/gribble/internal/common"
 	"go.spiff.io/gribble/internal/sqlite"
 	"golang.org/x/sync/errgroup"
 )
@@ -23,6 +24,7 @@ const (
 )
 
 type DB interface {
+	CreateRunner(context.Context, *com.Runner) error
 	Migrate(context.Context) error
 }
 
@@ -53,11 +55,6 @@ func (p *Prog) init(flags *flag.FlagSet, argv []string) (err error) {
 	p.flags = flags
 	p.conf = &Config{
 		Listen: newSockAddr(defaultListenAddr),
-	}
-
-	p.server, err = NewServer(nil) // TODO: Configure server
-	if err != nil {
-		return err
 	}
 
 	flags.Usage = p.usage
@@ -123,7 +120,12 @@ func (p *Prog) listen() (net.Listener, error) {
 	return net.Listen(network, addr)
 }
 
-func (p *Prog) serve(ctx context.Context, listener net.Listener) error {
+func (p *Prog) serve(ctx context.Context, listener net.Listener) (err error) {
+	p.server, err = NewServer(nil, p.db) // TODO: Configure server
+	if err != nil {
+		return err
+	}
+
 	mux := httprouter.New()
 	mux.POST("/_gitlab/api/v4/runners", HandleJSON(p.server.RegisterRunner))
 	mux.POST("/_gitlab/api/v4/jobs/request", HandleJSON(p.server.RequestJob))
@@ -146,7 +148,7 @@ func (p *Prog) serve(ctx context.Context, listener net.Listener) error {
 		}
 	}()
 
-	err := sv.Serve(listener)
+	err = sv.Serve(listener)
 	if err == http.ErrServerClosed {
 		log.Printf("Server shutdown: %v", addr)
 		return nil

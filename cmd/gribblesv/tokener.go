@@ -8,6 +8,15 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+func genToken(length int, rand io.Reader) (string, error) {
+	key := make([]byte, length)
+	if _, err := io.ReadFull(rand, key); err != nil {
+		return "", err
+	}
+	token := zbase32.EncodeToString(key)
+	return token, nil
+}
+
 type randomToken struct {
 	length int
 	rand   io.Reader
@@ -34,12 +43,7 @@ func (r *randomToken) Refresh() error {
 	r.m.Lock()
 	defer r.m.Unlock()
 
-	key := make([]byte, r.length)
-	if _, err := io.ReadFull(r.rand, key); err != nil {
-		return err
-	}
-
-	token := zbase32.EncodeToString(key)
+	token, err := genToken(r.length, r.rand)
 	hash, err := bcrypt.GenerateFromPassword([]byte(token), hashStrength)
 	if err != nil {
 		return err

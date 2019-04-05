@@ -6,8 +6,11 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"strings"
+	"time"
 
 	"github.com/julienschmidt/httprouter"
+	com "go.spiff.io/gribble/internal/common"
 	gciwire "go.spiff.io/gribble/internal/gci-wire"
 )
 
@@ -17,10 +20,13 @@ var (
 
 const (
 	defaultTokenLength = 19
+	runnerTokenLen     = 19
 )
 
 type Server struct {
 	toker *randomToken
+	rng   io.Reader
+	db    DB
 }
 
 type ServerConfig struct {
@@ -42,7 +48,7 @@ func (s *ServerConfig) randReader() io.Reader {
 	return s.RandSource
 }
 
-func NewServer(conf *ServerConfig) (*Server, error) {
+func NewServer(conf *ServerConfig, db DB) (*Server, error) {
 	rng := conf.randReader()
 	tokenLen := conf.tokenLength()
 	toker, err := newRandomToken(tokenLen, rng)
@@ -55,6 +61,8 @@ func NewServer(conf *ServerConfig) (*Server, error) {
 
 	return &Server{
 		toker: toker,
+		rng:   rng,
+		db:    db,
 	}, nil
 }
 
@@ -68,8 +76,26 @@ func (s *Server) RegisterRunner(w http.ResponseWriter, req *http.Request, params
 		return http.StatusForbidden, nil
 	}
 
+	token, err := genToken(runnerTokenLen, s.rng)
+	if err != nil {
+		return http.StatusInternalServerError, nil
+	}
+
+	runner := &com.Runner{
+		Token:       token,
+		Description: body.Description,
+		RunUntagged: body.RunUntagged,
+		MaxTimeout:  time.Duration(body.MaximumTimeout) * time.Second,
+		Tags:        runnerTags(body.Tags),
+	}
+	ctx := req.Context()
+	if err := s.db.CreateRunner(ctx, runner); err != nil {
+		log.Printf("Error creating runner: %v", err)
+		return http.StatusInternalServerError, nil
+	}
+
 	rep := gciwire.RegisterRunnerResponse{
-		Token: "buttsquid",
+		Token: token,
 	}
 	return http.StatusCreated, &rep
 }
@@ -108,4 +134,17 @@ func (s *Server) RequestJob(w http.ResponseWriter, req *http.Request, params htt
 	}
 
 	return http.StatusNoContent, nil
+}
+
+func runnerTags(tags string) []string {
+	r := strings.Split(tags, ",")
+	t := r[:0]
+	for _, tag := range r {
+		tag = strings.TrimSpace(tag)
+		if tag == "" {
+			continue
+		}
+		t = append(t, tag)
+	}
+	return t
 }

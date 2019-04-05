@@ -118,24 +118,3 @@ func applyPatch(ctx context.Context, conn *sqlite.Conn, savepoint string, patch 
 	}
 	return InSavepoint(ctx, conn, savepoint, apply)
 }
-
-func eachRow(ctx context.Context, stmt *sqlite.Stmt, fn func() error) (err error) {
-	defer func() {
-		rerr := stmt.Reset()
-		if err == nil {
-			err = rerr
-		}
-	}()
-	var haveRows bool
-	for {
-		if err = ctx.Err(); err != nil {
-			return err
-		}
-		if haveRows, err = stmt.Step(); err != nil || !haveRows {
-			return err
-		}
-		if err = fn(); err != nil {
-			return err
-		}
-	}
-}
