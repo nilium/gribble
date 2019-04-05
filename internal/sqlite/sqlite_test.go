@@ -83,17 +83,24 @@ func TestStatementPatch(t *testing.T) {
 	}
 
 	// Test that panic errors are returned
-	errPanic := errors.New("panic")
-	patchPanic := NewSimplePatch("error-patch", "error-component", 2, func(ctx context.Context, conn *sqlite.Conn) error {
-		panic(errPanic)
-	})
-	withPanic := PatchSet{
-		patch,
-		patchPanic,
-	}
-	if err := withPanic.Apply(ctx, conn); err != errPanic {
-		t.Fatalf("normal.Apply() err = %#v; want %#v", err, errPanic)
-	}
+	func(t *testing.T) {
+		defer func() {
+			if rc := recover(); rc == nil {
+				t.Error("Apply did not panic")
+			}
+		}()
+		errPanic := errors.New("panic")
+		patchPanic := NewSimplePatch("error-patch", "error-component", 2, func(ctx context.Context, conn *sqlite.Conn) error {
+			panic(errPanic)
+		})
+		withPanic := PatchSet{
+			patch,
+			patchPanic,
+		}
+		if err := withPanic.Apply(ctx, conn); err != errPanic {
+			t.Fatalf("normal.Apply() err = %#v; want %#v", err, errPanic)
+		}
+	}(t)
 
 	want := map[string]int{
 		"test-component": 1,

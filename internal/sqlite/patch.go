@@ -6,6 +6,7 @@ import (
 	"log"
 
 	"crawshaw.io/sqlite"
+	"crawshaw.io/sqlite/sqlitex"
 )
 
 type SimplePatch struct {
@@ -51,19 +52,7 @@ func applyStatement(ctx context.Context, conn *sqlite.Conn, sql string) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	stmt, _, err := conn.PrepareTransient(sql)
-	if err != nil {
-		return err
-	}
-	defer stmt.Finalize()
-	for {
-		haveRows, err := stmt.Step()
-		if err != nil {
-			return nil
-		} else if !haveRows {
-			return nil
-		}
-	}
+	return sqlitex.ExecTransient(conn, sql, nil)
 }
 
 type Patch interface {

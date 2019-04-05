@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/julienschmidt/httprouter"
-	com "go.spiff.io/gribble/internal/common"
 	"go.spiff.io/gribble/internal/sqlite"
 	"golang.org/x/sync/errgroup"
 )
@@ -22,11 +21,6 @@ const (
 	defaultListenAddr  = "127.0.0.1:4077"
 	defaultGracePeriod = time.Second * 30
 )
-
-type DB interface {
-	CreateRunner(context.Context, *com.Runner) error
-	Migrate(context.Context) error
-}
 
 func main() {
 	var (

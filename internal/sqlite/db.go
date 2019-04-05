@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -91,17 +92,11 @@ func (db *DB) createVersionTable(ctx context.Context) error {
 	}
 	defer db.Put(conn)
 
-	stmt, _, err := conn.PrepareTransient(`CREATE TABLE versions (
-	component TEXT PRIMARY KEY,
-	version INT
-)`)
-	if err != nil {
-		return err
-	}
-	defer stmt.Finalize()
-
-	_, err = stmt.Step()
-	return err
+	return sqlitex.ExecTransient(conn,
+		`CREATE TABLE versions (
+			component TEXT PRIMARY KEY,
+			version INT
+		)`, nil)
 }
 
 func (db *DB) Migrate(ctx context.Context) error {
@@ -126,6 +121,83 @@ func (db *DB) CreateRunner(ctx context.Context, runner *com.Runner) error {
 	return db.savepoint(ctx, conn, func() error {
 		return createRunner(conn, runner)
 	})
+}
+
+func (db *DB) GetRunnerByToken(ctx context.Context, token string, getDeleted bool) (*com.Runner, error) {
+	conn := db.Get(ctx)
+	if conn == nil {
+		return nil, ErrNoConnection
+	}
+	defer db.Put(conn)
+
+	get := conn.Prep(
+		`SELECT
+			id, description, run_untagged, locked, active, max_timeout, deleted
+		FROM runners
+		WHERE token = $token
+		LIMIT 1`)
+	defer get.Reset()
+
+	get.SetText("$token", token)
+	haveRows, err := get.Step()
+
+	if err != nil {
+		return nil, err
+	} else if !haveRows {
+		return nil, com.ErrNotFound
+	}
+
+	deleted := itob(get.GetInt64("deleted"))
+	if !getDeleted && deleted {
+		return nil, com.ErrNotFound
+	}
+
+	r := &com.Runner{
+		ID:          get.GetInt64("id"),
+		Token:       token,
+		Description: get.GetText("description"),
+		RunUntagged: itob(get.GetInt64("run_untagged")),
+		Locked:      itob(get.GetInt64("locked")),
+		Active:      itob(get.GetInt64("active")),
+		MaxTimeout:  itod(get.GetInt64("max_timeout")),
+		Deleted:     deleted,
+	}
+
+	return r, nil
+}
+
+func (db *DB) GetRunnerTags(ctx context.Context, runner *com.Runner) error {
+	if runner.ID <= 0 {
+		return com.ErrNoID
+	}
+
+	conn := db.Get(ctx)
+	if conn == nil {
+		return ErrNoConnection
+	}
+	defer db.Put(conn)
+
+	get := conn.Prep(`SELECT tags.tag FROM runner_tags INNER JOIN tags ON runner_tags.tag = tags.id WHERE runner = $runner`)
+	defer get.Reset()
+
+	get.SetInt64("$runner", runner.ID)
+
+	var tags []string
+	for {
+		haveRows, err := get.Step()
+		if err != nil {
+			return err
+		} else if !haveRows {
+			break
+		}
+		tag := get.GetText("tag")
+		tags = append(tags, tag)
+	}
+
+	sort.Strings(tags)
+	runner.Tags = tags
+
+	return nil
 }
 
 func createRunner(conn *sqlite.Conn, runner *com.Runner) error {

@@ -19,8 +19,8 @@ var (
 )
 
 const (
-	defaultTokenLength = 19
-	runnerTokenLen     = 19
+	defaultTokenLength = 20
+	runnerTokenLen     = 48
 )
 
 type Server struct {
@@ -84,9 +84,11 @@ func (s *Server) RegisterRunner(w http.ResponseWriter, req *http.Request, params
 	runner := &com.Runner{
 		Token:       token,
 		Description: body.Description,
+		Tags:        runnerTags(body.Tags),
 		RunUntagged: body.RunUntagged,
 		MaxTimeout:  time.Duration(body.MaximumTimeout) * time.Second,
-		Tags:        runnerTags(body.Tags),
+		Locked:      body.Locked,
+		Active:      body.Active,
 	}
 	ctx := req.Context()
 	if err := s.db.CreateRunner(ctx, runner); err != nil {
@@ -131,6 +133,19 @@ func (s *Server) RequestJob(w http.ResponseWriter, req *http.Request, params htt
 	var body gciwire.JobRequest
 	if err := ReadJSON(req.Body, &body); err != nil {
 		return http.StatusBadRequest, errBadRequest
+	}
+
+	ctx := req.Context()
+	runner, err := s.db.GetRunnerByToken(ctx, body.Token, false)
+	if err != nil {
+		return http.StatusForbidden, nil
+	}
+	if err = s.db.GetRunnerTags(ctx, runner); err != nil {
+		return http.StatusInternalServerError, nil
+	}
+
+	if !runner.Active {
+		return http.StatusNoContent, nil
 	}
 
 	return http.StatusNoContent, nil

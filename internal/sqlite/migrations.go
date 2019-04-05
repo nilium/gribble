@@ -6,10 +6,11 @@ var systemPatches = PatchSet{
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			token TEXT UNIQUE ON CONFLICT ABORT,
 			description TEXT,
-			run_untagged BOOLEAN,
-			locked BOOLEAN,
-			active BOOLEAN,
-			max_timeout INT
+			run_untagged BOOLEAN DEFAULT 0,
+			locked BOOLEAN DEFAULT 0,
+			active BOOLEAN DEFAULT 0,
+			max_timeout INT DEFAULT 0,
+			deleted BOOLEAN DEFAULT 0
 		)`,
 		`CREATE TABLE tags (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -20,6 +21,7 @@ var systemPatches = PatchSet{
 			runner INTEGER,
 			PRIMARY KEY (tag, runner)
 		)`,
+		`CREATE INDEX runner_tags_by_runner ON runner_tags (runner)`,
 		`CREATE TABLE jobs (
 			id INTEGER PRIMARY KEY AUTOINCREMENT
 		)`,

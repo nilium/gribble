@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"crawshaw.io/sqlite"
+	"crawshaw.io/sqlite/sqlitex"
 )
 
 type ReleaseError struct {
@@ -31,35 +32,21 @@ func InSavepoint(ctx context.Context, conn *sqlite.Conn, name string, transactio
 		return err
 	}
 
-	qname := QuoteIdentifier(name)
-
 	// Can't use bound names in these, so this is just kind of grody initialization
-	release, _, err := conn.PrepareTransient(`RELEASE SAVEPOINT ` + qname)
-	if err != nil {
-		return err
-	}
-	defer release.Finalize()
-
-	rollback, _, err := conn.PrepareTransient(`ROLLBACK TRANSACTION TO SAVEPOINT ` + qname)
-	if err != nil {
-		return err
-	}
-	defer rollback.Finalize()
-
-	savepoint, _, err := conn.PrepareTransient(`SAVEPOINT ` + qname)
-	if err != nil {
-		return err
-	}
-	defer savepoint.Finalize()
+	qname := QuoteIdentifier(name)
+	release := `RELEASE SAVEPOINT ` + qname
+	rollback := `ROLLBACK TRANSACTION TO SAVEPOINT ` + qname
+	savepoint := `SAVEPOINT ` + qname
 
 	// Create savepoint
-	if _, err = savepoint.Step(); err != nil {
+	if err = sqlitex.ExecTransient(conn, savepoint, nil); err != nil {
 		return err
 	}
 
 	// Clean up savepoint -- rollback in case of an error, and release the savepoint either way.
 	defer func() {
-		if rc := recover(); rc != nil {
+		rc := recover()
+		if rc != nil {
 			perr, ok := rc.(error)
 			if !ok || perr == nil {
 				perr = fmt.Errorf("transaction panic: %T: %v", rc, rc)
@@ -74,13 +61,20 @@ func InSavepoint(ctx context.Context, conn *sqlite.Conn, name string, transactio
 		}
 
 		if err != nil {
-			if _, ferr := rollback.Step(); ferr != nil {
-				err = &RollbackError{Savepoint: name, Err: ferr, TransactionErr: err}
+			if ferr := sqlitex.ExecTransient(conn, rollback, nil); ferr != nil {
+				ferr = &RollbackError{Savepoint: name, Err: ferr, TransactionErr: err}
+				panic(ferr)
 			}
 		}
 
-		if _, ferr := release.Step(); ferr != nil {
+		if ferr := sqlitex.ExecTransient(conn, release, nil); ferr != nil {
 			err = &ReleaseError{Savepoint: name, Err: ferr}
+			panic(err)
+		}
+
+		if rc != nil {
+			// Continue panicking
+			panic(rc)
 		}
 	}()
 
