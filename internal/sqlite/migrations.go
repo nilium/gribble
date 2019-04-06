@@ -11,7 +11,9 @@ var systemPatches = PatchSet{
 			locked BOOLEAN DEFAULT 0,
 			active BOOLEAN DEFAULT 0,
 			max_timeout INTEGER DEFAULT 0,
-			deleted BOOLEAN DEFAULT 0
+			deleted BOOLEAN DEFAULT 0,
+			created_time REALTIME,
+			updated_time REALTIME
 		)`,
 
 		`CREATE TABLE tags(
@@ -32,8 +34,11 @@ var systemPatches = PatchSet{
 		`CREATE TABLE jobs(
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			runner INTEGER,
+			features INTEGER DEFAULT 0,
 			state TEXT DEFAULT 'pending', -- gciwire.JobState
 			spec JSON, -- common.JobSpec
+			created_time REALTIME,
+			finished_time REALTIME,
 
 			FOREIGN KEY(runner) REFERENCES runners(id)
 		)`,

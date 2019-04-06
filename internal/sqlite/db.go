@@ -13,6 +13,7 @@ import (
 	"crawshaw.io/sqlite"
 	"crawshaw.io/sqlite/sqlitex"
 	com "go.spiff.io/gribble/internal/common"
+	"go.spiff.io/gribble/internal/proc"
 )
 
 var ErrNoConnection = errors.New("no connection")
@@ -134,8 +135,32 @@ func (db *DB) CreateRunner(ctx context.Context, runner *com.Runner) error {
 	defer db.put(conn)
 
 	return db.savepoint(ctx, conn, func() error {
-		return createRunner(conn, runner)
+		return createRunner(ctx, conn, runner)
 	})
+}
+
+func (db *DB) SetRunnerUpdatedTime(ctx context.Context, runner *com.Runner, t time.Time) error {
+	if runner.ID <= 0 {
+		return com.ErrNoID
+	}
+
+	conn := db.get(ctx)
+	if conn == nil {
+		return ErrNoConnection
+	}
+	defer db.put(conn)
+
+	set := conn.Prep(`UPDATE runners SET updated_time = $time WHERE id = $runner`)
+	defer set.Reset()
+	set.SetFloat("$time", ToSecs(t))
+	set.SetInt64("$runner", runner.ID)
+	_, err := set.Step()
+	if err != nil {
+		return err
+	}
+
+	runner.Updated = t
+	return nil
 }
 
 func (db *DB) GetRunnerByToken(ctx context.Context, token string, getDeleted bool) (*com.Runner, error) {
@@ -176,6 +201,8 @@ func (db *DB) GetRunnerByToken(ctx context.Context, token string, getDeleted boo
 		Active:      itob(get.GetInt64("active")),
 		MaxTimeout:  itod(get.GetInt64("max_timeout")),
 		Deleted:     deleted,
+		Created:     FromSecs(get.GetFloat("created_time")),
+		Updated:     FromSecs(get.GetFloat("updated_time")),
 	}
 
 	return r, nil
@@ -215,25 +242,31 @@ func (db *DB) GetRunnerTags(ctx context.Context, runner *com.Runner) error {
 	return nil
 }
 
-func createRunner(conn *sqlite.Conn, runner *com.Runner) error {
+func createRunner(ctx context.Context, conn *sqlite.Conn, runner *com.Runner) error {
 	stmt := conn.Prep(`INSERT INTO
-		runners(token, description, run_untagged, locked, max_timeout, active)
-		VALUES($token, $description, $run_untagged, $locked, $max_timeout, $active)`)
+		runners(token, description, run_untagged, locked, max_timeout, active, created_time, updated_time)
+		VALUES($token, $description, $run_untagged, $locked, $max_timeout, $active, $created_time, $updated_time)`)
 	defer stmt.Reset()
-	defer stmt.ClearBindings()
-	stmt.SetText("$token", runner.Token)
-	stmt.SetText("$description", runner.Description)
-	stmt.SetInt64("$run_untagged", btoi(runner.RunUntagged))
-	stmt.SetInt64("$locked", btoi(runner.Locked))
-	stmt.SetInt64("$active", btoi(runner.Active))
-	stmt.SetInt64("$max_timeout", dtoi(runner.MaxTimeout))
+
+	t := proc.Now(ctx)
+	updated := *runner
+	updated.Created = t
+	updated.Updated = t
+
+	stmt.SetText("$token", updated.Token)
+	stmt.SetText("$description", updated.Description)
+	stmt.SetInt64("$run_untagged", btoi(updated.RunUntagged))
+	stmt.SetInt64("$locked", btoi(updated.Locked))
+	stmt.SetInt64("$active", btoi(updated.Active))
+	stmt.SetInt64("$max_timeout", dtoi(updated.MaxTimeout))
+	stmt.SetFloat("$created_time", ToSecs(updated.Created))
+	stmt.SetFloat("$updated_time", ToSecs(updated.Updated))
 	_, err := stmt.Step()
 	if err != nil {
 		return err
 	}
 
 	id := conn.LastInsertRowID()
-	updated := *runner
 	updated.ID = id
 
 	if len(runner.Tags) == 0 {

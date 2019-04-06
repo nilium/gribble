@@ -1,17 +1,18 @@
 package main
 
 import (
+	"context"
 	"crypto/rand"
 	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/julienschmidt/httprouter"
 	com "go.spiff.io/gribble/internal/common"
 	gciwire "go.spiff.io/gribble/internal/gci-wire"
+	"go.spiff.io/gribble/internal/proc"
 )
 
 var (
@@ -64,6 +65,31 @@ func NewServer(conf *ServerConfig, db DB) (*Server, error) {
 		rng:   rng,
 		db:    db,
 	}, nil
+}
+
+func runnerFetchErrorCode(err error) int {
+	switch err {
+	case com.ErrNotFound:
+		return http.StatusForbidden
+	default:
+		return http.StatusInternalServerError
+	}
+}
+
+func (s *Server) getRunnerByToken(ctx context.Context, token string, tags bool) (*com.Runner, error) {
+	runner, err := s.db.GetRunnerByToken(ctx, token, false)
+	if err != nil {
+		return nil, err
+	}
+
+	now := proc.Now(ctx)
+	s.db.SetRunnerUpdatedTime(ctx, runner, now)
+
+	if !tags {
+	} else if err = s.db.GetRunnerTags(ctx, runner); err != nil {
+		return nil, err
+	}
+	return runner, err
 }
 
 func (s *Server) RegisterRunner(w http.ResponseWriter, req *http.Request, params httprouter.Params) (int, interface{}) {
@@ -136,12 +162,9 @@ func (s *Server) RequestJob(w http.ResponseWriter, req *http.Request, params htt
 	}
 
 	ctx := req.Context()
-	runner, err := s.db.GetRunnerByToken(ctx, body.Token, false)
+	runner, err := s.getRunnerByToken(ctx, body.Token, true)
 	if err != nil {
-		return http.StatusForbidden, nil
-	}
-	if err = s.db.GetRunnerTags(ctx, runner); err != nil {
-		return http.StatusInternalServerError, nil
+		return runnerFetchErrorCode(err), nil
 	}
 
 	if !runner.Active {
