@@ -18,7 +18,7 @@ import (
 var ErrNoConnection = errors.New("no connection")
 
 type DB struct {
-	*sqlitex.Pool
+	pool       *sqlitex.Pool
 	autosaveID uint64 // atomic
 }
 
@@ -28,7 +28,7 @@ func newFromPool(ctx context.Context, addr string, flags sqlite.OpenFlags, poolS
 		return nil, err
 	}
 	db := &DB{
-		Pool: pool,
+		pool: pool,
 	}
 
 	err = db.setupVersionTable(ctx)
@@ -49,6 +49,21 @@ func NewFileDB(ctx context.Context, path string, poolSize int) (*DB, error) {
 	return newFromPool(ctx, qpath, flags, poolSize)
 }
 
+func (db *DB) get(ctx context.Context) *sqlite.Conn {
+	conn := db.pool.Get(ctx)
+	if conn == nil {
+		return nil
+	}
+	if err := sqlitex.Exec(conn, `PRAGMA foreign_keys = ON`, nil); err != nil {
+		panic(err)
+	}
+	return conn
+}
+
+func (db *DB) put(conn *sqlite.Conn) {
+	db.pool.Put(conn)
+}
+
 func (db *DB) savepoint(ctx context.Context, conn *sqlite.Conn, transaction func() error) error {
 	id := atomic.AddUint64(&db.autosaveID, 1)
 	nsec := time.Now().UnixNano()
@@ -66,11 +81,11 @@ func (db *DB) setupVersionTable(ctx context.Context) error {
 }
 
 func (db *DB) haveTable(ctx context.Context, table string) (ok bool, err error) {
-	c := db.Get(ctx)
+	c := db.get(ctx)
 	if c == nil {
 		return false, ErrNoConnection
 	}
-	defer db.Put(c)
+	defer db.put(c)
 
 	stmt := c.Prep(`SELECT COUNT(*) AS found FROM sqlite_master WHERE name = $name LIMIT 1`)
 	defer stmt.Reset()
@@ -86,11 +101,11 @@ func (db *DB) haveTable(ctx context.Context, table string) (ok bool, err error) 
 }
 
 func (db *DB) createVersionTable(ctx context.Context) error {
-	conn := db.Get(ctx)
+	conn := db.get(ctx)
 	if conn == nil {
 		return ErrNoConnection
 	}
-	defer db.Put(conn)
+	defer db.put(conn)
 
 	return sqlitex.ExecTransient(conn,
 		`CREATE TABLE versions (
@@ -100,11 +115,11 @@ func (db *DB) createVersionTable(ctx context.Context) error {
 }
 
 func (db *DB) Migrate(ctx context.Context) error {
-	conn := db.Get(ctx)
+	conn := db.get(ctx)
 	if conn == nil {
 		return ErrNoConnection
 	}
-	defer db.Put(conn)
+	defer db.put(conn)
 	return systemPatches.Apply(ctx, conn)
 }
 
@@ -112,11 +127,11 @@ func (db *DB) CreateRunner(ctx context.Context, runner *com.Runner) error {
 	if err := runner.CanCreate(); err != nil {
 		return err
 	}
-	conn := db.Get(ctx)
+	conn := db.get(ctx)
 	if conn == nil {
 		return ErrNoConnection
 	}
-	defer db.Put(conn)
+	defer db.put(conn)
 
 	return db.savepoint(ctx, conn, func() error {
 		return createRunner(conn, runner)
@@ -124,11 +139,11 @@ func (db *DB) CreateRunner(ctx context.Context, runner *com.Runner) error {
 }
 
 func (db *DB) GetRunnerByToken(ctx context.Context, token string, getDeleted bool) (*com.Runner, error) {
-	conn := db.Get(ctx)
+	conn := db.get(ctx)
 	if conn == nil {
 		return nil, ErrNoConnection
 	}
-	defer db.Put(conn)
+	defer db.put(conn)
 
 	get := conn.Prep(
 		`SELECT
@@ -171,11 +186,11 @@ func (db *DB) GetRunnerTags(ctx context.Context, runner *com.Runner) error {
 		return com.ErrNoID
 	}
 
-	conn := db.Get(ctx)
+	conn := db.get(ctx)
 	if conn == nil {
 		return ErrNoConnection
 	}
-	defer db.Put(conn)
+	defer db.put(conn)
 
 	get := conn.Prep(`SELECT tags.tag FROM runner_tags INNER JOIN tags ON runner_tags.tag = tags.id WHERE runner = $runner`)
 	defer get.Reset()
@@ -237,11 +252,11 @@ func (db *DB) TagRunner(ctx context.Context, runner *com.Runner, tags []string) 
 		return com.ErrNoID
 	}
 
-	conn := db.Get(ctx)
+	conn := db.get(ctx)
 	if conn == nil {
 		return ErrNoConnection
 	}
-	defer db.Put(conn)
+	defer db.put(conn)
 
 	return db.savepoint(ctx, conn, func() error {
 		return tagRunner(conn, runner, tags)
@@ -319,7 +334,7 @@ func ensureTag(conn *sqlite.Conn, tag string) (int64, error) {
 }
 
 func (db *DB) Close() error {
-	return db.Pool.Close()
+	return db.pool.Close()
 }
 
 func btoi(b bool) int64 {
