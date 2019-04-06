@@ -22,11 +22,11 @@ func TestVersions(t *testing.T) {
 		t.Fatalf("setupVersionTable() = %#v; want nil", err)
 	}
 
-	conn := db.Get(ctx)
+	conn := db.get(ctx)
 	if conn == nil {
 		t.Fatal("No connection available")
 	}
-	defer db.Put(conn)
+	defer db.put(conn)
 
 	stmt := conn.Prep(`SELECT COUNT(*) AS n FROM versions`)
 	defer stmt.Finalize()
@@ -52,11 +52,11 @@ func TestStatementPatch(t *testing.T) {
 	}
 	defer db.Close()
 
-	conn := db.Get(ctx)
+	conn := db.get(ctx)
 	if conn == nil {
 		t.Fatal("No connection available")
 	}
-	defer db.Put(conn)
+	defer db.put(conn)
 
 	// Test normal patch application (and that it does not repeat)
 	patch := StatementPatch("test-patch", "test-component", 1,
