@@ -4,6 +4,8 @@ import (
 	"errors"
 	"strings"
 	"time"
+
+	gciwire "go.spiff.io/gribble/internal/gci-wire"
 )
 
 var ErrNil = errors.New("resource is nil")
@@ -44,4 +46,15 @@ func ParseTags(tags string) []string {
 		t = append(t, tag)
 	}
 	return t
+}
+
+type Job struct {
+	ID     int64
+	Runner int64
+	State  gciwire.JobState
+	Spec   *JobSpec
+}
+
+type JobSpec struct {
+	GitLab gciwire.JobResponse `json:"gitlab,omitempty"`
 }
