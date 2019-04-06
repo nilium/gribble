@@ -84,7 +84,7 @@ func (s *Server) RegisterRunner(w http.ResponseWriter, req *http.Request, params
 	runner := &com.Runner{
 		Token:       token,
 		Description: body.Description,
-		Tags:        runnerTags(body.Tags),
+		Tags:        com.ParseTags(body.Tags),
 		RunUntagged: body.RunUntagged,
 		MaxTimeout:  time.Duration(body.MaximumTimeout) * time.Second,
 		Locked:      body.Locked,
@@ -151,15 +151,3 @@ func (s *Server) RequestJob(w http.ResponseWriter, req *http.Request, params htt
 	return http.StatusNoContent, nil
 }
 
-func runnerTags(tags string) []string {
-	r := strings.Split(tags, ",")
-	t := r[:0]
-	for _, tag := range r {
-		tag = strings.TrimSpace(tag)
-		if tag == "" {
-			continue
-		}
-		t = append(t, tag)
-	}
-	return t
-}

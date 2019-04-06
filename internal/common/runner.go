@@ -2,6 +2,7 @@ package com
 
 import (
 	"errors"
+	"strings"
 	"time"
 )
 
@@ -30,4 +31,17 @@ func (r *Runner) CanCreate() error {
 		return ErrNoToken
 	}
 	return nil
+}
+
+func ParseTags(tags string) []string {
+	r := strings.Split(tags, ",")
+	t := r[:0]
+	for _, tag := range r {
+		tag = strings.TrimSpace(tag)
+		if tag == "" {
+			continue
+		}
+		t = append(t, tag)
+	}
+	return t
 }
