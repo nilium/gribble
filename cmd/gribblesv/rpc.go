@@ -132,7 +132,7 @@ func (s *Server) RegisterRunner(w http.ResponseWriter, req *http.Request, params
 func (s *Server) PatchTrace(w http.ResponseWriter, req *http.Request, params httprouter.Params) (code int, msg interface{}) {
 	trace, err := ioutil.ReadAll(req.Body)
 	if err != nil {
-		log.Printf("Unable to consume trace: %v job=%s", err)
+		log.Printf("Unable to consume trace: %v job=%s", err, params[0].Value)
 		return http.StatusBadRequest, errBadRequest
 	}
 
