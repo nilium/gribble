@@ -1,0 +1,38 @@
+# syntax = docker/dockerfile:experimental
+
+# Update xbps in base image as a precaution
+FROM voidlinux/voidlinux:latest AS base
+RUN xbps-install -Sy xbps || :; rm -rf /var/cache/xbps
+
+# Build gribble/cmd/...
+FROM base AS build
+RUN --mount=type=cache,sharing=private,target=/var/cache/xbps \
+    xbps-install -y go gcc git
+
+WORKDIR /build/workspace
+COPY . .
+
+ENV GOPATH=/go
+ENV GOBIN=/build/workspace/bin
+ENV GOCACHE=/go/_gocache
+
+RUN --mount=type=cache,sharing=private,target=/go/pkg \
+    --mount=type=cache,sharing=private,target=/go/_gocache \
+    go mod verify
+RUN --mount=type=cache,sharing=private,target=/go/pkg \
+    --mount=type=cache,sharing=private,target=/go/_gocache \
+    go install -v ./cmd/...
+
+# Final image
+FROM base AS final
+
+RUN useradd -r -U -s/bin/false -d/var/lib/gribble _gribble
+RUN install -o _gribble -g _gribble -m700 -d /var/lib/gribble
+COPY --from=build /build/workspace/bin /usr/local/bin
+
+VOLUME /var/lib/gribble
+WORKDIR /var/lib/gribble
+
+EXPOSE 4077
+
+ENTRYPOINT ["chpst", "-u", "_gribble", "/usr/local/bin/gribblesv", "-L=0.0.0.0:4077"]
