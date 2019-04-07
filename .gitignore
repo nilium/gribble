@@ -1,0 +1,7 @@
+_*
+.*.sw[a-z]
+*~
+.DS_Store
+*.db
+*-wal
+*-shm
