@@ -123,3 +123,25 @@ func TestStatementPatch(t *testing.T) {
 		t.Errorf("eachRow() = %v; want nil", err)
 	}
 }
+
+func TestMigrations(t *testing.T) {
+	ctx := context.Background()
+	db, err := NewMemoryDB(ctx, 1)
+	if err != nil {
+		panic(fmt.Errorf("Error opening DB pool: %v", err))
+	}
+	defer db.Close()
+
+	for i, p := range systemPatches {
+		ps := PatchSet{p}
+		name := fmt.Sprintf("%d_%s_%s_v%d", i, p.Name(), p.Component(), p.Version())
+		ok := t.Run(name, func(t *testing.T) {
+			if err := db.migrate(ctx, ps); err != nil {
+				t.Fatalf("Migration failed: (%T) %v", err, err)
+			}
+		})
+		if !ok {
+			t.FailNow()
+		}
+	}
+}

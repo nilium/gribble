@@ -116,12 +116,16 @@ func (db *DB) createVersionTable(ctx context.Context) error {
 }
 
 func (db *DB) Migrate(ctx context.Context) error {
+	return db.migrate(ctx, systemPatches)
+}
+
+func (db *DB) migrate(ctx context.Context, patches PatchSet) error {
 	conn := db.get(ctx)
 	if conn == nil {
 		return ErrNoConnection
 	}
 	defer db.put(conn)
-	return systemPatches.Apply(ctx, conn)
+	return patches.Apply(ctx, conn)
 }
 
 func (db *DB) CreateRunner(ctx context.Context, runner *com.Runner) error {
