@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/google/go-github/v24/github"
 	"github.com/julienschmidt/httprouter"
 	com "go.spiff.io/gribble/internal/common"
 	gciwire "go.spiff.io/gribble/internal/gci-wire"
@@ -174,3 +175,28 @@ func (s *Server) RequestJob(w http.ResponseWriter, req *http.Request, params htt
 	return http.StatusNoContent, nil
 }
 
+func (s *Server) RecvWebhook(w http.ResponseWriter, req *http.Request, params httprouter.Params) (code int, msg interface{}) {
+	typ := github.WebHookType(req)
+	switch typ {
+	case "push", "pull_request", "pull_request_review_comment":
+	default:
+		return http.StatusBadRequest, nil
+	}
+
+	// TODO: Validate signature.
+
+	body, err := ioutil.ReadAll(req.Body)
+	if err != nil {
+		return http.StatusBadRequest, nil
+	}
+
+	payload, err := github.ParseWebHook(typ, body)
+	if err != nil {
+		return http.StatusBadRequest, nil
+	}
+
+	log.Printf("-- WEBHOOK --\n%s\n-- END WEBHOOK --", body)
+	log.Print(payload)
+
+	return http.StatusNoContent, nil
+}

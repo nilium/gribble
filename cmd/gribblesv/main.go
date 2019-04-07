@@ -125,6 +125,7 @@ func (p *Prog) serve(ctx context.Context, listener net.Listener) (err error) {
 	mux.POST("/_gitlab/api/v4/jobs/request", HandleJSON(p.server.RequestJob))
 	mux.PATCH("/_gitlab/api/v4/jobs/:id/trace", HandleJSON(p.server.PatchTrace))
 	mux.PUT("/_gitlab/api/v4/jobs/:id", HandleJSON(p.server.UpdateJob))
+	mux.POST("/v1/events/github", HandleJSON(p.server.RecvWebhook))
 
 	logger := AccessLog(mux)
 
