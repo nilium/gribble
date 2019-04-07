@@ -2,7 +2,7 @@ package sqlite
 
 var systemPatches = PatchSet{
 	// Initialize gribble tables and indices
-	StatementPatch("gribble/init", "base-system", 1,
+	StatementPatch("gribble-init", "base-system", 1,
 		`CREATE TABLE runners(
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			token TEXT UNIQUE ON CONFLICT ABORT,
@@ -15,6 +15,26 @@ var systemPatches = PatchSet{
 			created_time REALTIME,
 			updated_time REALTIME
 		)`,
+
+		`CREATE TABLE runner_locks(
+			runner INTEGER,
+			project INTEGER,
+			PRIMARY KEY(runner, project),
+			FOREIGN KEY(runner) REFERENCES runners(id),
+			FOREIGN KEY(project) REFERENCES projects(id)
+		)`,
+
+		`CREATE TABLE projects(
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			source TEXT, -- such as 'github'
+			source_id NUMERIC,
+
+			name TEXT,
+			path TEXT,
+			url TEXT,
+			clone_url TEXT
+		)`,
+		`CREATE INDEX projects_by_source ON projects(source, source_id)`,
 
 		`CREATE TABLE tags(
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -36,6 +56,7 @@ var systemPatches = PatchSet{
 			runner INTEGER,
 			features INTEGER DEFAULT 0,
 			state TEXT DEFAULT 'pending', -- gciwire.JobState
+			project INTEGER,
 			spec JSON, -- common.JobSpec
 			created_time REALTIME,
 			finished_time REALTIME,
