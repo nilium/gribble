@@ -31,4 +31,4 @@ COPY --from=build /build/workspace/bin /usr/local/bin
 WORKDIR /var/lib/gribble
 EXPOSE 4077
 
-ENTRYPOINT ["chpst", "-u", "_gribble", "/usr/local/bin/gribblesv", "-L=0.0.0.0:4077"]
+ENTRYPOINT ["chpst", "-u", "_gribble", "/usr/local/bin/gribblesv", "-http-listen-addr=0.0.0.0:4077"]

@@ -10,16 +10,11 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"time"
+	"sort"
+	"strings"
 
 	"github.com/julienschmidt/httprouter"
-	"go.spiff.io/gribble/internal/sqlite"
 	"golang.org/x/sync/errgroup"
-)
-
-const (
-	defaultListenAddr  = "127.0.0.1:4077"
-	defaultGracePeriod = time.Second * 30
 )
 
 func main() {
@@ -47,9 +42,7 @@ type Prog struct {
 
 func (p *Prog) init(flags *flag.FlagSet, argv []string) (err error) {
 	p.flags = flags
-	p.conf = &Config{
-		Listen: newSockAddr(defaultListenAddr),
-	}
+	p.conf = DefaultConfig()
 
 	flags.Usage = p.usage
 	bindConfigFlags(flags, p.conf)
@@ -70,7 +63,7 @@ func (p Prog) Run(ctx context.Context, flags *flag.FlagSet, argv ...string) (cod
 	ctx = cancelOnSignal(ctx, shutdownSignals()...)
 
 	// TODO: Configurable databases, probably, once the interface is better-defined.
-	db, err := sqlite.NewFileDB(ctx, "gribble.db", 8)
+	db, err := NewDatabase(ctx, p.conf)
 	if err != nil {
 		log.Printf("Unable to open database: %v", err)
 		return 1
@@ -152,17 +145,48 @@ func (p *Prog) serve(ctx context.Context, listener net.Listener) (err error) {
 }
 
 func (p *Prog) usage() {
+	var backendNames []string
+	for k := range backends {
+		backendNames = append(backendNames, k.String())
+	}
+	sort.Strings(backendNames)
+	fmtBackendNames := strings.Join(backendNames, "\n      - ")
+
 	fmt.Fprint(p.stderr, `Usage: gribblesv [options]
 
 Options:
--L ADDR    Listen on ADDR. (default `, defaultListenAddr, `)
--t DUR     Shutdown grace period. (default `, defaultGracePeriod, `)
+  -h, -help
+    Print this usage text.
+
+  -http-listen-addr SOCKADDR (default `, defaultListenAddr, `)
+    Address the HTTP server binds on. May be a TCP address and port
+    (1.2.3.4:80) or a path to a Unix domain socket.
+
+  -http-grace-period DUR (default `, defaultGracePeriod, `)
+    HTTP server shutdown grace period.
+
+  -backend BACKEND (default: `, defaultBackendName, `)
+    Database driver backend.
+    May be one of the following:
+      - `, fmtBackendNames, `
+
+SQLite Backend:
+  -sqlite-file FILE (default: `, defaultSQLiteFile, `)
+    SQLite database file.
+    (sqlite)
+
+  -sqlite-pool-size SIZE (default: `, defaultSQLitePoolSize, `)
+    SQLite backend connection pool size.
+    (sqlite, sqlite-memory)
 `)
 }
 
-func bindConfigFlags(f *flag.FlagSet, c *Config) {
-	f.Var(NewTextFlag(c.Listen), "L", "Listen `address`")
-	f.DurationVar(&c.GracePeriod, "t", c.GracePeriod, "Shutdown grace period")
+func bindConfigFlags(f *flag.FlagSet, conf *Config) {
+	f.Var(NewTextFlag(&conf.DB), "backend", "Database `backend`")
+	f.StringVar(&conf.SQLiteFile, "sqlite-file", conf.SQLiteFile, "SQLite database file")
+	f.IntVar(&conf.SQLitePoolSize, "sqlite-pool-size", conf.SQLitePoolSize, "SQLite pool size")
+	f.Var(NewTextFlag(conf.Listen), "http-listen-addr", "Listen `address`")
+	f.DurationVar(&conf.GracePeriod, "http-grace-period", conf.GracePeriod, "Shutdown grace period")
 }
 
 func cancelOnSignal(ctx context.Context, signals ...os.Signal) context.Context {

@@ -9,11 +9,42 @@ import (
 	"github.com/hashicorp/go-sockaddr"
 )
 
-type Config struct {
-	Listen *SockAddr
+const (
+	defaultListenAddr  = "127.0.0.1:4077"
+	defaultGracePeriod = time.Second * 30
 
+	defaultBackendName BackendName = "sqlite"
+
+	defaultSQLiteFile     = "gribble.db"
+	defaultSQLitePoolSize = 8
+)
+
+func DefaultConfig() *Config {
+	return &Config{
+		Listen:      newSockAddr(defaultListenAddr),
+		GracePeriod: defaultGracePeriod,
+
+		DB: defaultBackendName,
+		// SQLite defaults
+		SQLiteFile:     defaultSQLiteFile,
+		SQLitePoolSize: defaultSQLitePoolSize,
+	}
+}
+
+type Config struct {
+	// Listen is the address the HTTP server should bind to.
+	Listen *SockAddr
 	// GracePeriod is how long the HTTP server will wait to finalize requests and shut down.
 	GracePeriod time.Duration
+
+	// DB is any valid database supported by gribble.
+	// These are declared under backend.go in the backends map.
+	DB BackendName
+
+	// SQLite (go.spiff.io/gribble/internal/sqlite)
+	// Driver: sqlite, sqlite-memory
+	SQLiteFile     string // sqlite
+	SQLitePoolSize int    // sqlite, sqlite-memory
 }
 
 type SockAddr struct {
