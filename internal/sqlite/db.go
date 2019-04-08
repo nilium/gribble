@@ -41,13 +41,16 @@ func newFromPool(ctx context.Context, addr string, flags sqlite.OpenFlags, poolS
 }
 
 func NewMemoryDB(ctx context.Context, poolSize int) (*DB, error) {
-	return newFromPool(ctx, "file:memory:?mode=memory", 0, poolSize)
+	const flags = sqlite.SQLITE_OPEN_URI |
+		sqlite.SQLITE_OPEN_SHAREDCACHE |
+		sqlite.SQLITE_OPEN_NOMUTEX |
+		sqlite.SQLITE_OPEN_READWRITE
+	return newFromPool(ctx, "file::memory:?mode=memory", flags, poolSize)
 }
 
 func NewFileDB(ctx context.Context, path string, poolSize int) (*DB, error) {
-	const flags = sqlite.SQLITE_OPEN_READWRITE | sqlite.SQLITE_OPEN_CREATE
 	qpath := "file:" + url.PathEscape(path)
-	return newFromPool(ctx, qpath, flags, poolSize)
+	return newFromPool(ctx, qpath, 0, poolSize)
 }
 
 func (db *DB) get(ctx context.Context) *sqlite.Conn {
