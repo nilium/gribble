@@ -112,7 +112,10 @@ func (p *Prog) listen() (net.Listener, error) {
 }
 
 func (p *Prog) serve(ctx context.Context, listener net.Listener) (err error) {
-	p.server, err = NewServer(nil, p.db) // TODO: Configure server
+	conf := &ServerConfig{
+		GitHubToken: p.conf.GitHubToken,
+	}
+	p.server, err = NewServer(conf, p.db) // TODO: Configure server
 	if err != nil {
 		return err
 	}
@@ -162,6 +165,12 @@ Options:
   -http-grace-period DUR (default `, defaultGracePeriod, `)
     HTTP server shutdown grace period.
 
+  -github-token
+    The GitHub token to validate GitHub events with.
+    If not given, GitHub events are not accepted.
+    Can be set to DEV (uppercase) to allow all events without
+    validation.
+
   -backend BACKEND (default: `, defaultBackendName, `)
     Database driver backend.
     May be one of the following:
@@ -179,11 +188,13 @@ SQLite Backend:
 }
 
 func bindConfigFlags(f *flag.FlagSet, conf *Config) {
+	f.Var(NewTextFlag(conf.Listen), "http-listen-addr", "Listen `address`")
+	f.DurationVar(&conf.GracePeriod, "http-grace-period", conf.GracePeriod, "Shutdown grace period")
+	f.StringVar(&conf.GitHubToken, "github-token", conf.GitHubToken, "GitHub token")
+
 	f.Var(NewTextFlag(&conf.DB), "backend", "Database `backend`")
 	f.StringVar(&conf.SQLiteFile, "sqlite-file", conf.SQLiteFile, "SQLite database file")
 	f.IntVar(&conf.SQLitePoolSize, "sqlite-pool-size", conf.SQLitePoolSize, "SQLite pool size")
-	f.Var(NewTextFlag(conf.Listen), "http-listen-addr", "Listen `address`")
-	f.DurationVar(&conf.GracePeriod, "http-grace-period", conf.GracePeriod, "Shutdown grace period")
 }
 
 func cancelOnSignal(ctx context.Context, signals ...os.Signal) context.Context {

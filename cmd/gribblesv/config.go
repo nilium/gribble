@@ -37,6 +37,9 @@ type Config struct {
 	// GracePeriod is how long the HTTP server will wait to finalize requests and shut down.
 	GracePeriod time.Duration `envi:"HTTP_GRACE_PERIOD"`
 
+	// GitHubToken is the webhook token used to validate incoming events.
+	GitHubToken string `envi:"GITHUB_TOKEN"`
+
 	// DB is any valid database supported by gribble.
 	// These are declared under backend.go in the backends map.
 	DB BackendName `envi:"BACKEND"`

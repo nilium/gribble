@@ -31,11 +31,14 @@ type Server struct {
 
 	toker *randomToken
 	rng   io.Reader
+
+	githubToken []byte
 }
 
 type ServerConfig struct {
 	TokenLength int
 	RandSource  io.Reader
+	GitHubToken string
 }
 
 func (s *ServerConfig) tokenLength() int {
@@ -72,6 +75,17 @@ func NewServer(conf *ServerConfig, db DB) (*Server, error) {
 	s.mux.POST("/_gitlab/api/v4/jobs/request", HandleJSON(s.RequestJob))
 	s.mux.PATCH("/_gitlab/api/v4/jobs/:id/trace", HandleJSON(s.PatchTrace))
 	s.mux.PUT("/_gitlab/api/v4/jobs/:id", HandleJSON(s.UpdateJob))
+
+	if token := []byte(conf.GitHubToken); len(token) > 0 {
+		if conf.GitHubToken == "DEV" {
+			// If token is DEV (uppercase), don't validate payloads by using an empty
+			// token. Assigned to nil instead of doing a != for readability's sake.
+			// This means you can't have a token that is DEV.
+			token = nil
+		}
+		s.githubToken = token
+		s.mux.POST("/v1/events/github", HandleJSON(s.GitHubEvent))
+	}
 
 	return s, nil
 }
@@ -192,19 +206,17 @@ func (s *Server) RequestJob(w http.ResponseWriter, req *http.Request, params htt
 	return http.StatusNoContent, nil
 }
 
-func (s *Server) RecvWebhook(w http.ResponseWriter, req *http.Request, params httprouter.Params) (code int, msg interface{}) {
+func (s *Server) GitHubEvent(w http.ResponseWriter, req *http.Request, params httprouter.Params) (code int, msg interface{}) {
 	typ := github.WebHookType(req)
 	switch typ {
 	case "push", "pull_request", "pull_request_review_comment":
 	default:
-		return http.StatusBadRequest, nil
+		return http.StatusNotFound, nil
 	}
 
-	// TODO: Validate signature.
-
-	body, err := ioutil.ReadAll(req.Body)
+	body, err := github.ValidatePayload(req, s.githubToken)
 	if err != nil {
-		return http.StatusBadRequest, nil
+		return http.StatusForbidden, nil
 	}
 
 	payload, err := github.ParseWebHook(typ, body)
@@ -215,5 +227,5 @@ func (s *Server) RecvWebhook(w http.ResponseWriter, req *http.Request, params ht
 	log.Printf("-- WEBHOOK --\n%s\n-- END WEBHOOK --", body)
 	log.Print(payload)
 
-	return http.StatusNoContent, nil
+	return http.StatusAccepted, nil
 }
