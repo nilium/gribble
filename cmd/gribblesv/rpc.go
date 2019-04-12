@@ -26,9 +26,11 @@ const (
 )
 
 type Server struct {
+	mux *httprouter.Router
+	db  DB
+
 	toker *randomToken
 	rng   io.Reader
-	db    DB
 }
 
 type ServerConfig struct {
@@ -58,14 +60,24 @@ func NewServer(conf *ServerConfig, db DB) (*Server, error) {
 		return nil, err
 	}
 
-	tok, _ := toker.Token()
-	log.Printf("Server token: %q", tok)
+	s := &Server{
+		mux: httprouter.New(),
+		db:  db,
 
-	return &Server{
 		toker: toker,
 		rng:   rng,
-		db:    db,
-	}, nil
+	}
+
+	s.mux.POST("/_gitlab/api/v4/runners", HandleJSON(s.RegisterRunner))
+	s.mux.POST("/_gitlab/api/v4/jobs/request", HandleJSON(s.RequestJob))
+	s.mux.PATCH("/_gitlab/api/v4/jobs/:id/trace", HandleJSON(s.PatchTrace))
+	s.mux.PUT("/_gitlab/api/v4/jobs/:id", HandleJSON(s.UpdateJob))
+
+	return s, nil
+}
+
+func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	s.mux.ServeHTTP(w, req)
 }
 
 func runnerFetchErrorCode(err error) int {
@@ -75,6 +87,11 @@ func runnerFetchErrorCode(err error) int {
 	default:
 		return http.StatusInternalServerError
 	}
+}
+
+func (s *Server) Token() string {
+	tok, _ := s.toker.Token()
+	return tok
 }
 
 func (s *Server) getRunnerByToken(ctx context.Context, token string, tags bool) (*com.Runner, error) {
