@@ -5,7 +5,6 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	"reflect"
 	"strconv"
 
 	"github.com/julienschmidt/httprouter"
@@ -40,16 +39,11 @@ func ReadJSON(r io.Reader, dest interface{}) error {
 //
 // The JSON handler function must have the following form:
 //
-//      func(msg T, w http.ResponseWriter, r *http.Request, p httprouter.Params) (code int, rep interface{})
-//
-// The msg T, above, is expected to be either a pointer to a struct or a value that can be
-// allocated via reflection and unmarshalled from JSON.
+//      func(w http.ResponseWriter, r *http.Request, p httprouter.Params) (code int, rep interface{})
 //
 // The rep interface{} returned from the JSON handler is encoded as the JSON response body. The code
 // returned is the HTTP status code. If the rep returned is an error, the error is written in
 // response as an ErrorRep.
-//
-// If the function is not of the correct type, the HandleJSON or the returned handler will panic.
 func HandleJSON(fn JSONHandle) httprouter.Handle {
 	return func(w http.ResponseWriter, req *http.Request, params httprouter.Params) {
 		code := http.StatusInternalServerError
@@ -96,20 +90,5 @@ func writeRep(w http.ResponseWriter, code int, rep interface{}, req *http.Reques
 	w.WriteHeader(code)
 	if p != nil {
 		_, _ = w.Write(p)
-	}
-}
-
-func allocator(typ reflect.Type) func() (val reflect.Value, ptr interface{}) {
-	isPtr := typ.Kind() == reflect.Ptr
-	if isPtr {
-		typ = typ.Elem()
-	}
-	return func() (val reflect.Value, ptr interface{}) {
-		rptr := reflect.New(typ)
-		val = rptr
-		if !isPtr {
-			val = val.Elem()
-		}
-		return val, rptr.Interface()
 	}
 }
