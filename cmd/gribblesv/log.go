@@ -1,17 +1,26 @@
 package main
 
 import (
-	"log"
 	"net/http"
 	"time"
+
+	"go.spiff.io/gribble/internal/proc"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 type AccessLogger struct {
-	next http.Handler
+	next   http.Handler
+	level  zapcore.Level
+	logger *zap.Logger
 }
 
-func AccessLog(next http.Handler) *AccessLogger {
-	return &AccessLogger{next}
+func AccessLog(next http.Handler, logger *zap.Logger, level zapcore.Level) *AccessLogger {
+	return &AccessLogger{
+		next:   next,
+		level:  level,
+		logger: logger.Named("access.log"),
+	}
 }
 
 type responseRecorder struct {
@@ -35,16 +44,24 @@ func (r *responseRecorder) Write(p []byte) (int, error) {
 }
 
 func (a *AccessLogger) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	ck := a.logger.Check(a.level, "Request received")
+	if ck == nil {
+		a.next.ServeHTTP(w, req)
+		return
+	}
+
+	ctx := req.Context()
 	rec := &responseRecorder{ResponseWriter: w}
 	defer func(t time.Time) {
-		log.Printf("%d %s %q %q %d %v",
-			rec.code,
-			req.Method,
-			req.RequestURI,
-			req.RemoteAddr,
-			rec.bytes,
-			time.Since(t),
+		ck.Write(
+			zap.Int("http_status", rec.code),
+			zap.String("http_method", req.Method),
+			zap.String("http_server", req.Host),
+			zap.String("http_request", req.RequestURI),
+			zap.String("http_remote_addr", req.RemoteAddr),
+			zap.Int64("http_bytes_written", rec.bytes),
+			zap.Duration("http_elapsed", proc.Now(ctx).Sub(t)),
 		)
-	}(time.Now())
+	}(proc.Now(ctx))
 	a.next.ServeHTTP(rec, req)
 }

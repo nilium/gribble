@@ -4,12 +4,13 @@ import (
 	"encoding/json"
 	"io"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"reflect"
 	"strconv"
 
 	"github.com/julienschmidt/httprouter"
+	"go.spiff.io/gribble/internal/proc"
+	"go.uber.org/zap"
 )
 
 const megabyte = 1024 * 1024
@@ -65,6 +66,7 @@ func HandleJSON(fn JSONHandle) httprouter.Handle {
 }
 
 func writeRep(w http.ResponseWriter, code int, rep interface{}, req *http.Request) {
+	ctx := req.Context()
 	err, _ := rep.(error)
 	if err != nil {
 		if code == 0 {
@@ -81,7 +83,10 @@ func writeRep(w http.ResponseWriter, code int, rep interface{}, req *http.Reques
 		code = http.StatusInternalServerError
 		rep = ErrorRep{Msg: "error encoding response"}
 		p, _ = json.Marshal(rep)
-		log.Printf("Error encoding response: %s: %v", req.RequestURI, err)
+		proc.Error(ctx, "Error encoding response",
+			zap.String("http_request", req.RequestURI),
+			zap.Error(err),
+		)
 	}
 
 	if p != nil {

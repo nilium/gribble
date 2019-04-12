@@ -3,10 +3,11 @@ package sqlite
 import (
 	"context"
 	"fmt"
-	"log"
 
 	"crawshaw.io/sqlite"
 	"crawshaw.io/sqlite/sqlitex"
+	"go.spiff.io/gribble/internal/proc"
+	"go.uber.org/zap"
 )
 
 type SimplePatch struct {
@@ -95,8 +96,11 @@ func applyPatch(ctx context.Context, conn *sqlite.Conn, savepoint string, patch 
 	ON CONFLICT (component) DO UPDATE SET version = excluded.version`)
 	defer updateVersion.Reset()
 	apply := func() error {
-		log.Printf("Applying patch %q: %q => %d",
-			patch.Name(), patch.Component(), patch.Version())
+		proc.Info(ctx, "Applying patch",
+			zap.String("patch", patch.Name()),
+			zap.String("component", patch.Component()),
+			zap.Int("version", patch.Version()),
+		)
 		err := patch.Apply(ctx, conn)
 		if err == nil {
 			updateVersion.SetText("$component", patch.Component())

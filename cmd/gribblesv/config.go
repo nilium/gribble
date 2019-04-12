@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-sockaddr"
+	"go.uber.org/zap/zapcore"
 )
 
 const (
@@ -17,6 +18,8 @@ const (
 
 	defaultSQLiteFile     = "gribble.db"
 	defaultSQLitePoolSize = 8
+
+	defaultLogLevel = zapcore.InfoLevel
 )
 
 func DefaultConfig() *Config {
@@ -48,6 +51,11 @@ type Config struct {
 	// Driver: sqlite, sqlite-memory
 	SQLiteFile     string `envi:"SQLITE_FILE"`      // sqlite
 	SQLitePoolSize int    `envi:"SQLITE_POOL_SIZE"` // sqlite, sqlite-memory
+
+	// LogLevel is the initial logging level of the process.
+	LogLevel zapcore.Level `envi:"LOG_LEVEL"`
+	// LogJSON, if true, will cause the process to emit logs in JSON format.
+	LogJSON bool `envi:"LOG_JSON"`
 }
 
 type SockAddr struct {

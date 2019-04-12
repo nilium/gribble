@@ -14,6 +14,7 @@ import (
 	com "go.spiff.io/gribble/internal/common"
 	gciwire "go.spiff.io/gribble/internal/gci-wire"
 	"go.spiff.io/gribble/internal/proc"
+	"go.uber.org/zap"
 )
 
 var (
@@ -125,6 +126,7 @@ func (s *Server) getRunnerByToken(ctx context.Context, token string, tags bool) 
 }
 
 func (s *Server) RegisterRunner(w http.ResponseWriter, req *http.Request, params httprouter.Params) (int, interface{}) {
+	ctx := req.Context()
 	var body gciwire.RegisterRunnerRequest
 	if err := ReadJSON(req.Body, &body); err != nil {
 		return http.StatusBadRequest, errBadRequest
@@ -148,9 +150,8 @@ func (s *Server) RegisterRunner(w http.ResponseWriter, req *http.Request, params
 		Locked:      body.Locked,
 		Active:      body.Active,
 	}
-	ctx := req.Context()
 	if err := s.db.CreateRunner(ctx, runner); err != nil {
-		log.Printf("Error creating runner: %v", err)
+		proc.Warn(ctx, "Error creating runner", zap.Error(err))
 		return http.StatusInternalServerError, nil
 	}
 
@@ -161,28 +162,38 @@ func (s *Server) RegisterRunner(w http.ResponseWriter, req *http.Request, params
 }
 
 func (s *Server) PatchTrace(w http.ResponseWriter, req *http.Request, params httprouter.Params) (code int, msg interface{}) {
+	ctx := req.Context()
 	trace, err := ioutil.ReadAll(req.Body)
+	job := params[0].Value
 	if err != nil {
-		log.Printf("Unable to consume trace: %v job=%s", err, params[0].Value)
+		proc.Warn(ctx, "Unable to consume trace",
+			zap.String("job_id", job),
+			zap.Error(err),
+		)
 		return http.StatusBadRequest, errBadRequest
 	}
 
-	log.Printf("-- START TRACE PATCH --\n%s\n-- END TRACE PATCH --", trace)
+	proc.Debug(ctx, "Trace patch received", zap.ByteString("trace", trace))
 
 	return http.StatusAccepted, nil
 }
 
 func (s *Server) UpdateJob(w http.ResponseWriter, req *http.Request, params httprouter.Params) (code int, msg interface{}) {
+	ctx := req.Context()
 	var body gciwire.UpdateJobRequest
 	if err := ReadJSON(req.Body, &body); err != nil {
 		return http.StatusBadRequest, errBadRequest
 	}
 
-	if body.Trace != nil {
-		log.Printf("-- START TRACE --\n%s\n-- END TRACE --", *body.Trace)
+	if trace := body.Trace; trace != nil {
+		proc.Debug(ctx, "Trace received", zap.String("trace", *trace))
 	}
 
-	log.Printf("Update job: %#+v %v %v", body.Info, body.State, body.FailureReason)
+	proc.Debug(ctx, "Update job",
+		zap.Any("info", body.Info),
+		zap.Any("state", body.State),
+		zap.Any("reason", body.FailureReason),
+	)
 	w.Header().Set("Job-Status", string(body.State))
 	return http.StatusOK, nil
 }
