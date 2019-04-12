@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/julienschmidt/httprouter"
+	"github.com/Kochava/envi"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -43,6 +44,10 @@ type Prog struct {
 func (p *Prog) init(flags *flag.FlagSet, argv []string) (err error) {
 	p.flags = flags
 	p.conf = DefaultConfig()
+
+	if err := envi.Getenv(p.conf, "GRIBBLE_"); err != nil && !envi.IsNoValue(err) {
+		return err
+	}
 
 	flags.Usage = p.usage
 	bindConfigFlags(flags, p.conf)

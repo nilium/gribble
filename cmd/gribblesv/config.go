@@ -33,18 +33,18 @@ func DefaultConfig() *Config {
 
 type Config struct {
 	// Listen is the address the HTTP server should bind to.
-	Listen *SockAddr
+	Listen *SockAddr `envi:"HTTP_LISTEN_ADDR"`
 	// GracePeriod is how long the HTTP server will wait to finalize requests and shut down.
-	GracePeriod time.Duration
+	GracePeriod time.Duration `envi:"HTTP_GRACE_PERIOD"`
 
 	// DB is any valid database supported by gribble.
 	// These are declared under backend.go in the backends map.
-	DB BackendName
+	DB BackendName `envi:"BACKEND"`
 
 	// SQLite (go.spiff.io/gribble/internal/sqlite)
 	// Driver: sqlite, sqlite-memory
-	SQLiteFile     string // sqlite
-	SQLitePoolSize int    // sqlite, sqlite-memory
+	SQLiteFile     string `envi:"SQLITE_FILE"`      // sqlite
+	SQLitePoolSize int    `envi:"SQLITE_POOL_SIZE"` // sqlite, sqlite-memory
 }
 
 type SockAddr struct {

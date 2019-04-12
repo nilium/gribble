@@ -2,6 +2,8 @@ crawshaw.io/iox v0.0.0-20181124134642-c51c3df30797 h1:yDf7ARQc637HoxDho7xjqdvO5Z
 crawshaw.io/iox v0.0.0-20181124134642-c51c3df30797/go.mod h1:sXBiorCo8c46JlQV3oXPKINnZ8mcqnye1EkVkqsectk=
 crawshaw.io/sqlite v0.0.0-20190411193835-4954e05e06ad h1:B46itwdD0L3RpB41q80hVw8yCB+skZ+fgTYuE1gt/4o=
 crawshaw.io/sqlite v0.0.0-20190411193835-4954e05e06ad/go.mod h1:BZaitnE9BVpocOuCdi/y5XReJMUelG53e/rDSLwSFzY=
+github.com/Kochava/envi v1.0.2 h1:EAj/3gsy/vDD72GP2sZzit+dMTVrZKwsF0YG1LcgXXo=
+github.com/Kochava/envi v1.0.2/go.mod h1:J/g3HFM8kRc6bFEqGyC3XRoxDUjG2O5ZiNQYJDKuaaM=
 github.com/armon/go-radix v0.0.0-20180808171621-7fddfc383310/go.mod h1:ufUuZ+zHj4x4TnLV4JWEpy2hxWSpsRywHrMgIH9cCH8=
 github.com/bgentry/speakeasy v0.1.0/go.mod h1:+zsyZBPWlz7T6j88CTgSN5bM796AkVf0kBD4zp0CCIs=
 github.com/fatih/color v1.7.0/go.mod h1:Zm6kSWBoL9eyXnKyktHP6abPY2pDugNf5KwzbycvMj4=

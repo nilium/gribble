@@ -5,6 +5,7 @@ go 1.12
 require (
 	crawshaw.io/iox v0.0.0-20181124134642-c51c3df30797 // indirect
 	crawshaw.io/sqlite v0.0.0-20190411193835-4954e05e06ad
+	github.com/Kochava/envi v1.0.2
 	github.com/google/go-github/v24 v24.0.1
 	github.com/hashicorp/go-sockaddr v1.0.2
 	github.com/julienschmidt/httprouter v1.2.0
