@@ -55,6 +55,7 @@ func (a *AccessLogger) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	defer func(t time.Time) {
 		ck.Write(
 			zap.Int("http_status", rec.code),
+			zap.Time("http_start", t),
 			zap.String("http_method", req.Method),
 			zap.String("http_server", req.Host),
 			zap.String("http_request", req.RequestURI),
