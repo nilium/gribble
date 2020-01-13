@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -30,9 +31,12 @@ type JSONHandle func(w http.ResponseWriter, req *http.Request, params httprouter
 func ReadJSON(r io.Reader, dest interface{}) error {
 	p, err := ioutil.ReadAll(r)
 	if err != nil {
-		return err
+		return fmt.Errorf("error reading JSON body: %w", err)
 	}
-	return json.Unmarshal(p, dest)
+	if err := json.Unmarshal(p, dest); err != nil {
+		return fmt.Errorf("error parsing JSON body: %w", err)
+	}
+	return nil
 }
 
 // HandleJSON returns an httprouter Handler function that wraps a JSON handler function.

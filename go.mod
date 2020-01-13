@@ -1,6 +1,6 @@
 module go.spiff.io/gribble
 
-go 1.12
+go 1.13
 
 require (
 	crawshaw.io/iox v0.0.0-20181124134642-c51c3df30797 // indirect
@@ -8,6 +8,7 @@ require (
 	github.com/Kochava/envi v1.0.2
 	github.com/google/go-github/v24 v24.0.1
 	github.com/hashicorp/go-sockaddr v1.0.2
+	github.com/jmoiron/sqlx v1.2.0
 	github.com/julienschmidt/httprouter v1.2.0
 	github.com/pkg/errors v0.8.1 // indirect
 	github.com/stretchr/testify v1.3.0 // indirect

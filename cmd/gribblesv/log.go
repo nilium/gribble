@@ -16,10 +16,13 @@ type AccessLogger struct {
 }
 
 func AccessLog(next http.Handler, logger *zap.Logger, level zapcore.Level) *AccessLogger {
+	if logger == nil {
+		logger = zap.L()
+	}
 	return &AccessLogger{
 		next:   next,
 		level:  level,
-		logger: logger.Named("access.log"),
+		logger: logger.Named("access"),
 	}
 }
 
